@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Validador DNI - Página práctica</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--accent:#0ea5a0;--muted:#94a3b8;--danger:#ff6b6b}
+    *{box-sizing:border-box;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial}
+    body{margin:0;min-height:100vh;background:linear-gradient(180deg,#061025 0%, #0f1724 100%);color:#e6eef6;display:flex;align-items:center;justify-content:center;padding:2rem}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;padding:28px;max-width:720px;width:100%;box-shadow:0 8px 30px rgba(2,6,23,0.7)}
+    h1{margin:0 0 8px;font-size:1.4rem}
+    p.lead{color:var(--muted);margin:0 0 18px}
+    .form-row{display:flex;gap:12px;margin-bottom:12px}
+    label{display:block;font-size:0.85rem;color:var(--muted);margin-bottom:6px}
+    input[type="text"], input[type="number"]{width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;outline:none}
+    .small{font-size:0.8rem;color:var(--muted)}
+    .btn{display:inline-block;padding:10px 16px;border-radius:10px;border:none;background:var(--accent);color:#042022;font-weight:600;cursor:pointer}
+    .btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+    .result{margin-top:14px;padding:12px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.03)}
+    .ok{color:#06d6a0;font-weight:700}
+    .bad{color:var(--danger);font-weight:700}
+    .hint{font-size:0.85rem;color:var(--muted);margin-top:8px}
+    footer{margin-top:18px;color:var(--muted);font-size:0.8rem}
+    @media(max-width:520px){.form-row{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <main class="card" role="main">
+    <h1>Validador de DNI (España)</h1>
+    <p class="lead">Introduce el número de DNI y la letra para comprobar si coinciden. (Validación cliente con JavaScript)</p>
+
+    <form id="dniForm" novalidate>
+      <div class="form-row">
+        <div style="flex:1">
+          <label for="dni">Número de DNI</label>
+          <input id="dni" name="dni" inputmode="numeric" pattern="\d*" placeholder="12345678" required />
+          <div class="small">Debe ser un número entre 0 y 99,999,999 (sin espacios ni puntos).</div>
+        </div>
+        <div style="width:130px">
+          <label for="letra">Letra</label>
+          <input id="letra" name="letra" maxlength="1" placeholder="A" required style="text-transform:uppercase" />
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+        <button type="submit" class="btn">Validar</button>
+        <button type="button" id="resetBtn" class="btn secondary">Limpiar</button>
+      </div>
+
+      <div id="message" class="result" aria-live="polite" hidden></div>
+
+      <p class="hint">Cálculo: resto = dni % 23 → letra = letras[resto]. Array de letras utilizado por el script.</p>
+    </form>
+
+    <footer>Hecho para la práctica — Rellena tu nombre y grupo aquí: __________________</footer>
+  </main>
+
+  <script>
+    (function(){
+      // array de letras según la práctica
+      const letras = ['T','R','W','A','G','M','Y','F','P','D','X','B','N','J','Z','S','Q','V','H','L','C','K','E','T'];
+
+      const form = document.getElementById('dniForm');
+      const dniEl = document.getElementById('dni');
+      const letraEl = document.getElementById('letra');
+      const msg = document.getElementById('message');
+      const resetBtn = document.getElementById('resetBtn');
+
+      // evita introducir caracteres no numéricos en el campo dni
+      dniEl.addEventListener('input', e=>{
+        // quitar cualquier cosa que no sea dígito
+        const cleaned = e.target.value.replace(/\D+/g, '');
+        if (cleaned !== e.target.value) e.target.value = cleaned;
+      });
+
+      // forzar mayúscula de la letra
+      letraEl.addEventListener('input', e=>{ e.target.value = e.target.value.toUpperCase(); });
+
+      resetBtn.addEventListener('click', ()=>{
+        form.reset(); msg.hidden = true; msg.textContent = '';
+      });
+
+      form.addEventListener('submit', function(ev){
+        ev.preventDefault();
+        msg.hidden = false;
+        msg.className = 'result';
+
+        // parsear número (si campo vacío devuelve NaN)
+        const dniStr = dniEl.value.trim();
+        const letraUser = (letraEl.value || '').trim().toUpperCase();
+
+        // Primero, comprobar en una sola instrucción si el número es inválido (<0 o >99999999 o no numérico)
+        const dniNum = Number(dniStr);
+        if (isNaN(dniNum) || (dniNum < 0 || dniNum > 99999999)) {
+          msg.innerHTML = '<span class="bad">Número no válido.</span> Introduce un número entre 0 y 99,999,999.';
+          return; // no mostrar más mensajes
+        }
+
+        // calcular letra correspondiente
+        const resto = dniNum % 23;
+        const letraCalc = letras[resto];
+
+        // comparar con la letra del usuario
+        if (!letraUser || letraUser.length !== 1 || !/^[A-Z]$/.test(letraUser)){
+          msg.innerHTML = '<span class="bad">Letra inválida.</span> Introduce una sola letra (A-Z).';
+          return;
+        }
+
+        if (letraUser !== letraCalc) {
+          msg.innerHTML = `<span class="bad">Letra incorrecta.</span> Para el número <strong>${dniNum}</strong> la letra correcta es <strong>${letraCalc}</strong>, no ${letraUser}.`;
+        } else {
+          msg.innerHTML = `<span class="ok">Correcto.</span> El número <strong>${dniNum}</strong> y la letra <strong>${letraCalc}</strong> coinciden.`;
+        }
+      });
+
+    })();
+  </script>
+</body>
+</html>
