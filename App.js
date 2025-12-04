@@ -1,172 +1,109 @@
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useRef, useState } from 'react';
-import { Button, View, Image, Text, StyleSheet, TextInput, TouchableOpacity, Linking, Alert } from 'react-native';
+import { useState, useEffect } from 'react';
+import { Text, View, StyleSheet, Button, Alert, TouchableOpacity, Linking } from 'react-native';
+import { CameraView, Camera } from 'expo-camera';
 
 export default function App() {
-  const [permission, requestPermission] = useCameraPermissions();
-  const cameraRef = useRef(null);
-  const [photo, setPhoto] = useState(null);
-  const [showCamera, setShowCamera] = useState(false);
-  const [showQRScanner, setShowQRScanner] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [hasPermission, setHasPermission] = useState(null);
+  const [scanned, setScanned] = useState(false);
+  const [scannedData, setScannedData] = useState(null);
 
-  if (!permission) return <View />;
+  useEffect(() => {
+    const getCameraPermissions = async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasPermission(status === 'granted');
+    };
 
-  if (!permission.granted) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.permissionText}>Necesitas permitir acceso a la cámara</Text>
-        <Button title="Dar permiso" onPress={requestPermission} />
-      </View>
-    );
-  }
+    getCameraPermissions();
+  }, []);
 
-  const takePhoto = async () => {
-    if (cameraRef.current) {
-      const result = await cameraRef.current.takePictureAsync();
-      setPhoto(result.uri);
-      setShowCamera(false);
-    }
-  };
-
-  const handleBarcodeScanned = ({ data }) => {
-    setShowQRScanner(false);
+  const handleBarcodeScanned = ({ type, data }) => {
+    setScanned(true);
+    setScannedData(data);
     
-    // Verificar si es una URL válida
+    // Si es una URL, preguntar si quiere abrirla
     if (data.startsWith('http://') || data.startsWith('https://')) {
       Alert.alert(
-        'Código QR Escaneado',
-        `¿Deseas abrir este enlace?\n\n${data}`,
+        '¡QR Escaneado!',
+        `URL encontrada: ${data}`,
         [
           { text: 'Cancelar', style: 'cancel' },
-          { 
-            text: 'Abrir', 
-            onPress: () => {
-              Linking.openURL(data).catch(err => {
-                Alert.alert('Error', 'No se pudo abrir el enlace');
-                console.error('Error al abrir URL:', err);
-              });
-            }
-          }
+          { text: 'Abrir URL', onPress: () => Linking.openURL(data) }
         ]
       );
     } else {
-      Alert.alert('Código QR Escaneado', data);
+      Alert.alert('¡QR Escaneado!', `Datos: ${data}`);
     }
   };
 
-  const handleLogin = () => {
-    console.log('Login:', username, password, photo);
-    // Aquí va tu lógica de login
-  };
-
-  if (showQRScanner) {
+  if (hasPermission === null) {
     return (
-      <View style={styles.cameraContainer}>
-        <CameraView 
-          ref={cameraRef} 
-          style={styles.camera} 
-          facing="back"
-          barcodeScannerSettings={{
-            barcodeTypes: ['qr'],
-          }}
-          onBarcodeScanned={handleBarcodeScanned}
-        />
-        <View style={styles.qrOverlay}>
-          <View style={styles.qrFrame} />
-          <Text style={styles.qrInstructions}>
-            Apunta al código QR para escanearlo
-          </Text>
-        </View>
-        <View style={styles.cameraButtons}>
-          <TouchableOpacity 
-            style={styles.cancelButton} 
-            onPress={() => setShowQRScanner(false)}
-          >
-            <Text style={styles.cancelButtonText}>Cancelar</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.container}>
+        <Text style={styles.message}>Solicitando permisos de cámara...</Text>
       </View>
     );
   }
 
-  if (showCamera) {
+  if (hasPermission === false) {
     return (
-      <View style={styles.cameraContainer}>
-        <CameraView ref={cameraRef} style={styles.camera} facing="front" />
-        <View style={styles.cameraButtons}>
-          <TouchableOpacity style={styles.captureButton} onPress={takePhoto}>
-            <Text style={styles.captureButtonText}>Capturar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.cancelButton} onPress={() => setShowCamera(false)}>
-            <Text style={styles.cancelButtonText}>Cancelar</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.container}>
+        <Text style={styles.message}>No tienes permisos para usar la cámara</Text>
+        <TouchableOpacity style={styles.button} onPress={() => Camera.requestCameraPermissionsAsync()}>
+          <Text style={styles.buttonText}>Solicitar Permisos</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.loginCard}>
-        <Text style={styles.title}>Inicio de Sesión</Text>
-        
-        <View style={styles.photoContainer}>
-          <TouchableOpacity onPress={() => setShowCamera(true)}>
-            {photo ? (
-              <Image source={{ uri: photo }} style={styles.photoPreview} />
-            ) : (
-              <View style={styles.photoPlaceholder}>
-                <View style={styles.userIcon}>
-                  <View style={styles.userIconHead} />
-                  <View style={styles.userIconBody} />
-                </View>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={styles.shareButton} onPress={() => setShowCamera(true)}>
-          <Text style={styles.shareButtonText}>COMPARTIR</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.photoButton} onPress={() => setShowCamera(true)}>
-          <Text style={styles.photoButtonText}>TOMAR UNA FOTO</Text>
-        </TouchableOpacity>
-
-        {/* Nuevo botón para escanear QR */}
-        <TouchableOpacity style={styles.qrButton} onPress={() => setShowQRScanner(true)}>
-          <Text style={styles.qrButtonText}>📱 ESCANEAR CÓDIGO QR</Text>
-        </TouchableOpacity>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Nombre de usuario:</Text>
-          <TextInput
-            style={styles.input}
-            value={username}
-            onChangeText={setUsername}
-            placeholder="Usuario"
-            placeholderTextColor="#999"
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Contraseña:</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="••••••••"
-            placeholderTextColor="#999"
-            secureTextEntry
-          />
-        </View>
-
-        <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-          <Text style={styles.loginButtonText}>ACEPTAR</Text>
-        </TouchableOpacity>
+      <View style={styles.header}>
+        <Text style={styles.title}>Escáner de QR</Text>
+        <Text style={styles.subtitle}>Apunta al código QR</Text>
       </View>
+
+      <View style={styles.cameraContainer}>
+        <CameraView
+          style={styles.camera}
+          facing='back'
+          onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
+          barcodeScannerSettings={{
+            barcodeTypes: ['qr'],
+          }}
+        >
+          <View style={styles.overlay}>
+            <View style={styles.unfocusedContainer}></View>
+            <View style={styles.middleContainer}>
+              <View style={styles.unfocusedContainer}></View>
+              <View style={styles.focusedContainer}>
+                <View style={[styles.corner, styles.topLeft]} />
+                <View style={[styles.corner, styles.topRight]} />
+                <View style={[styles.corner, styles.bottomLeft]} />
+                <View style={[styles.corner, styles.bottomRight]} />
+              </View>
+              <View style={styles.unfocusedContainer}></View>
+            </View>
+            <View style={styles.unfocusedContainer}></View>
+          </View>
+        </CameraView>
+      </View>
+
+      {scannedData && (
+        <View style={styles.resultContainer}>
+          <Text style={styles.resultLabel}>Último escaneo:</Text>
+          <Text style={styles.resultText} numberOfLines={2}>
+            {scannedData}
+          </Text>
+        </View>
+      )}
+
+      {scanned && (
+        <TouchableOpacity 
+          style={styles.scanButton} 
+          onPress={() => setScanned(false)}
+        >
+          <Text style={styles.scanButtonText}>Escanear de nuevo</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -175,197 +112,130 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1a1a2e',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
   },
-  loginCard: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#2d2d44',
-    borderRadius: 30,
-    padding: 30,
+  header: {
+    paddingTop: 60,
+    paddingBottom: 20,
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#4a4aff',
   },
   title: {
-    fontSize: 18,
-    color: '#ffffff',
-    marginBottom: 20,
-    fontWeight: '500',
-  },
-  photoContainer: {
-    width: 150,
-    height: 150,
-    marginBottom: 20,
-  },
-  photoPlaceholder: {
-    width: 150,
-    height: 150,
-    backgroundColor: '#ffffff',
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  photoPreview: {
-    width: 150,
-    height: 150,
-    borderRadius: 10,
-  },
-  userIcon: {
-    alignItems: 'center',
-  },
-  userIconHead: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#000',
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
     marginBottom: 5,
   },
-  userIconBody: {
-    width: 60,
-    height: 35,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    backgroundColor: '#000',
-  },
-  shareButton: {
-    backgroundColor: '#4a4aff',
-    paddingHorizontal: 30,
-    paddingVertical: 10,
-    borderRadius: 5,
-    marginBottom: 10,
-  },
-  shareButtonText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  photoButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#4a4aff',
-    paddingHorizontal: 25,
-    paddingVertical: 8,
-    borderRadius: 5,
-    marginBottom: 15,
-  },
-  photoButtonText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  qrButton: {
-    backgroundColor: '#ff6b35',
-    paddingHorizontal: 25,
-    paddingVertical: 10,
-    borderRadius: 5,
-    marginBottom: 25,
-    width: '100%',
-    alignItems: 'center',
-  },
-  qrButtonText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  inputContainer: {
-    width: '100%',
-    marginBottom: 15,
-  },
-  inputLabel: {
-    color: '#999',
-    fontSize: 12,
-    marginBottom: 5,
-  },
-  input: {
-    width: '100%',
-    backgroundColor: '#ffffff',
-    borderRadius: 5,
-    padding: 10,
-    fontSize: 14,
-    color: '#000',
-  },
-  loginButton: {
-    backgroundColor: '#4a4aff',
-    paddingHorizontal: 50,
-    paddingVertical: 12,
-    borderRadius: 5,
-    marginTop: 10,
-  },
-  loginButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 'bold',
+  subtitle: {
+    fontSize: 16,
+    color: '#a0a0a0',
   },
   cameraContainer: {
     flex: 1,
+    width: '90%',
+    maxHeight: 500,
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginVertical: 20,
   },
   camera: {
     flex: 1,
   },
-  cameraButtons: {
-    position: 'absolute',
-    bottom: 40,
-    left: 0,
-    right: 0,
+  overlay: {
+    flex: 1,
+  },
+  unfocusedContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  middleContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 40,
+    flex: 1.5,
   },
-  captureButton: {
-    backgroundColor: '#4a4aff',
-    paddingHorizontal: 40,
-    paddingVertical: 15,
-    borderRadius: 10,
+  focusedContainer: {
+    flex: 6,
+    position: 'relative',
   },
-  captureButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  cancelButton: {
-    backgroundColor: '#ff4a4a',
-    paddingHorizontal: 40,
-    paddingVertical: 15,
-    borderRadius: 10,
-  },
-  cancelButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  permissionText: {
-    color: '#ffffff',
-    fontSize: 16,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  qrOverlay: {
+  corner: {
     position: 'absolute',
+    width: 40,
+    height: 40,
+    borderColor: '#00d9ff',
+  },
+  topLeft: {
     top: 0,
     left: 0,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+  },
+  topRight: {
+    top: 0,
     right: 0,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+  },
+  bottomLeft: {
     bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
+    left: 0,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
   },
-  qrFrame: {
-    width: 250,
-    height: 250,
-    borderWidth: 3,
-    borderColor: '#4a4aff',
-    borderRadius: 20,
-    backgroundColor: 'transparent',
+  bottomRight: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
   },
-  qrInstructions: {
-    color: '#ffffff',
-    fontSize: 16,
-    marginTop: 30,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+  resultContainer: {
+    width: '90%',
+    backgroundColor: '#16213e',
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 12,
+    marginBottom: 15,
+  },
+  resultLabel: {
+    fontSize: 14,
+    color: '#00d9ff',
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  resultText: {
+    fontSize: 16,
+    color: '#fff',
+  },
+  scanButton: {
+    backgroundColor: '#00d9ff',
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 25,
+    marginBottom: 40,
+    shadowColor: '#00d9ff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  scanButtonText: {
+    color: '#1a1a2e',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  message: {
+    fontSize: 18,
+    color: '#fff',
     textAlign: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 30,
+  },
+  button: {
+    backgroundColor: '#00d9ff',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+  },
+  buttonText: {
+    color: '#1a1a2e',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
